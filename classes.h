@@ -3,12 +3,16 @@
 #include <vector>
 #include <algorithm>
 #include <vector>
+#include <queue>
+#include <list>
+#include <unistd.h>
 
 using namespace std;
 
 ///////////////////////////////////////////////////////// NODE CLASS DEFINITION /////////////////////////////////////////////////////////
 class Node {
     public:
+        Node();
         Node(int, int[]);
         //~Node();
         int size; 
@@ -18,11 +22,24 @@ class Node {
 
 };
 
+Node::Node() {
+    // Default constructor.
+}
+
 Node::Node( int n, int numbers[] ) {
-    size = n;
-    nums = numbers;
+    this->size = n;
+    this->nums = new int[this->size*this->size];
+    for (int i = 0; i < this->size*this->size; i++){
+      this->nums[i] = numbers[i];
+    }
     // Create a 2d array which represents the puzzle board with size n*n
-    boardFromNUmbers(size, numbers);
+    this->board = boardFromNUmbers(this->size, this->nums);
+    //for(int i = 0; i<size*size;i++){
+        //cout << "tempnums = " << tempNums[i] << endl;
+        //cout <<"numbers at the node constructor without this = "  << nums[i] << endl;
+        //cout <<"numbers at the node constructor with this = "  << this->nums[i] << endl;
+        //cout <<"numbers at the node constructor argument = "  << numbers[i] << endl;
+    //}
 
 }
 
@@ -42,6 +59,7 @@ int** Node::boardFromNUmbers(int n, int numbers[] ) {
             count++;
         }
     }
+    return board;
 }
 
 
@@ -51,26 +69,103 @@ int** Node::boardFromNUmbers(int n, int numbers[] ) {
 ///////////////////////////////////////////////////////// STATE CLASS DEFINITION /////////////////////////////////////////////////////////
 class State  : public Node {
     public:
+        State();
+        State(const State &);
         State(int, int[]);
+        // ~State();
         State* predecessor;
-        void findIndex(int *i, int *j, int elem);
-        void swapElementes(int* arr, int i, int j, int a, int b);
-        vector<State> findSuccessors();
-        void setPredecessor(State s);
+        void setPredecessor();
+        void setPredecessor(State &s);
+        bool operator== (State & other) {
+            for (int i = 0; i < size*size; i++){
+                if (this->nums[i] != other.nums[i])
+                    return false;
+            }
+            return true;
+        }
 };
+
+State::State():Node() {
+    // Default constructor.
+}
+
+State::State(const State &obj):Node() {
+    this->size = obj.size;
+    this->nums = new int[obj.size];
+    this->nums = obj.nums;
+    this->board = boardFromNUmbers(this->size, this->nums);
+    predecessor = obj.predecessor;
+}
 
 State::State( int n, int numbers[] ):Node(n, numbers) {
     // Constructor calls Node constructor here.
+    //size = n;
+    //nums = numbers;
+    //predecessor = this;
 }
 
-void State::setPredecessor(State s) {
+/*State::~State() {
+    delete[] predecessor;
+}*/
+
+void State::setPredecessor() {
+
+    predecessor = this;
+}
+
+void State::setPredecessor(State &s) {
     predecessor = &s;
 }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void State::findIndex(int *first, int *second, int elem) {
-    for (int i=0; i<size; i++) {
-        for (int j=0; j<size; j++) {
-            if (board[i][j] == elem){
+void printState(State *s);
+void showq(queue<State*> gq);
+
+void printState(State *s){
+  for (int i = 0; i < s->size; i++) {
+      for (int j = 0; j < s->size; j++) {
+          cout << s->board[i][j] << " ";
+      }
+      cout << endl;
+  }
+  cout << "-------------" << endl;
+ }
+
+ // Print the queue
+void showq(queue<State> gq)
+{
+    queue<State> g = gq;
+    while (!(g.empty())) {
+        printState(&g.front());
+        g.pop();
+    }
+}
+
+ 
+
+
+///////////////////////////////////////////////////////// SEARCH CLASS DEFINITION /////////////////////////////////////////////////////////
+class BreadthFirstSearch {
+    public:
+        BreadthFirstSearch(int n, int numbers[]);
+        int size;
+        int* numbers;
+        void findIndex(State &, int *, int *, int);
+        void swapElementes(int*, int, int, int, int, int);
+        vector<State> findSuccessors(State);
+        vector<State> search();
+};
+
+BreadthFirstSearch::BreadthFirstSearch(int n, int numbers[]) {
+    this->size = n;
+    this->numbers = new int[this->size * this->size];
+    this->numbers = numbers;
+}
+
+void BreadthFirstSearch::findIndex(State & s, int *first, int *second, int elem) {
+    for (int i=0; i<s.size; i++) {
+        for (int j=0; j<s.size; j++) {
+            if (s.board[i][j] == elem){
                 *first = i;
                 *second = j;
                 return;
@@ -79,45 +174,120 @@ void State::findIndex(int *first, int *second, int elem) {
     }    
 }
 
-void State::swapElementes(int* arr, int i, int j, int a, int b) {
-    copy(nums, nums+(size*size), arr);
+void BreadthFirstSearch::swapElementes(int* arr, int i, int j, int a, int b, int size) {
     swap(arr[size*i + j], arr[size*a + b]);
 }
 
-vector<State> State::findSuccessors() {
+vector<State> BreadthFirstSearch::findSuccessors(State s) {
+    int size = s.size;
     // Create successors vector.
     vector<State> succ;
     // Find the index of element "0" on the board.
     int first = 0;
     int second = 0;
-    this->findIndex(&first, &second, 0);
+    findIndex(s, &first, &second, 0);
     // Find the elements on the board that are neighbour with the element "0".
     // There can be maximum 4 swaps with element "0". Find these four possibile moves and ignore the illegal ones.
+    int tempNums[size*size];
     for (int i = -1; i<=1; i+=2){
         if (first+i >= 0 && first+i < size){
-            cout<<"i = "<<first+i<<" j = "<<second<< endl;
-            int tempNums[size*size];
-            copy(nums, nums+(size*size), tempNums);
+            copy(s.nums, (s.nums)+(size*size), tempNums);
             // Swap elements, create states and add to the vector.
-            swapElementes(tempNums, first, second, first+i, second);
+            swapElementes(tempNums, first, second, first+i, second, size);
             succ.push_back(State(size, tempNums));
         }
         if (second+i >= 0 && second+i < size){
-            cout<<"i = "<<first<<" j = "<<second+i<< endl;
-            int tempNums[size*size];
-            copy(nums, nums+(size*size), tempNums);
+            //int tempNums[size*size];
+            copy(s.nums, (s.nums)+(size*size), tempNums);
             // Swap elements, create states and add to the vector.d);
-            swapElementes(tempNums, first, second, first, second+i);
+            swapElementes(tempNums, first, second, first, second+i, size);
             succ.push_back(State(size, tempNums));
         }        
     }
     return succ;
 }
 
+vector<State> BreadthFirstSearch::search() {
+    int goalNumbers[] = {1,2,3,4,5,6,7,8,0};
+    int goalSize = 3;
+    int flag = 0;
+    int iter = 0;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    vector<State> solution;
+    list<State> visited;
+    queue<State> toBeExplored;
 
+    State goalState = State(goalSize, goalNumbers);
+    State currentState = State(this->size, this->numbers);
 
-///////////////////////////////////////////////////////// SEARCH CLASS DEFINITION /////////////////////////////////////////////////////////
+    if (currentState == goalState){
+        solution.push_back(currentState);
+        return solution;
+    }
+    printState(&currentState);
+    visited.push_back(currentState);
+    visited.back().setPredecessor();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    vector<State> s = findSuccessors(currentState);
+
+    for (auto& it : s) {
+        toBeExplored.push(it);
+        toBeExplored.back().setPredecessor(visited.back());
+    }
+
+    while (!toBeExplored.empty()) {
+        iter++;
+        cout << "ITERATION : " << iter << endl;
+
+        currentState = toBeExplored.front();
+
+        toBeExplored.pop();
+
+        visited.push_back(currentState);
+
+        if (currentState == goalState){
+            cout << "ENTERED GOAL STATE 1" << endl;
+            State* check; 
+            check = &(visited.back());
+            solution.push_back(*check);
+            while (check->predecessor != check) {
+                check = check->predecessor;
+                solution.push_back(*check);
+            }
+            return solution;
+        }
+
+        vector<State> succ = findSuccessors(currentState);
+        for (auto& it : succ) {
+            if (it == goalState){
+                it.setPredecessor(visited.back());
+                cout << "ENTERED GOAL STATE 2" << endl;
+                solution.push_back(it);
+                State *sPtr;
+                sPtr = &it;
+                while (sPtr->predecessor != sPtr) {
+                    sPtr = sPtr->predecessor;
+                    solution.push_back(*sPtr);
+                }
+                return solution;
+            }
+            else {;
+                for (auto& v : visited) {
+                    if (v == it) {
+                        flag = 1;
+                        break;
+                    }
+                }              
+                if (flag==0){
+                    it.setPredecessor(visited.back());
+                    toBeExplored.push(it);
+                }
+                flag = 0;
+            }
+        }
+    }
+    
+    return solution;
+
+}
+
