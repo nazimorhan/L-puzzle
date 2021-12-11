@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <vector>
 #include <queue>
+#include <stack>
 #include <list>
 #include <unistd.h>
 
@@ -34,13 +35,6 @@ Node::Node( int n, int numbers[] ) {
     }
     // Create a 2d array which represents the puzzle board with size n*n
     this->board = boardFromNUmbers(this->size, this->nums);
-    //for(int i = 0; i<size*size;i++){
-        //cout << "tempnums = " << tempNums[i] << endl;
-        //cout <<"numbers at the node constructor without this = "  << nums[i] << endl;
-        //cout <<"numbers at the node constructor with this = "  << this->nums[i] << endl;
-        //cout <<"numbers at the node constructor argument = "  << numbers[i] << endl;
-    //}
-
 }
 
 /*Node::~Node() {
@@ -74,6 +68,7 @@ class State  : public Node {
         State(int, int[]);
         // ~State();
         State* predecessor;
+        int depth;
         void setPredecessor();
         void setPredecessor(State &s);
         bool operator== (State & other) {
@@ -87,6 +82,7 @@ class State  : public Node {
 
 State::State():Node() {
     // Default constructor.
+    depth = 0;
 }
 
 State::State(const State &obj):Node() {
@@ -95,6 +91,7 @@ State::State(const State &obj):Node() {
     this->nums = obj.nums;
     this->board = boardFromNUmbers(this->size, this->nums);
     predecessor = obj.predecessor;
+    depth = obj.depth;
 }
 
 State::State( int n, int numbers[] ):Node(n, numbers) {
@@ -102,6 +99,7 @@ State::State( int n, int numbers[] ):Node(n, numbers) {
     //size = n;
     //nums = numbers;
     //predecessor = this;
+    depth = 0;
 }
 
 /*State::~State() {
@@ -140,29 +138,31 @@ void showq(queue<State> gq)
         g.pop();
     }
 }
-
  
-
-
 ///////////////////////////////////////////////////////// SEARCH CLASS DEFINITION /////////////////////////////////////////////////////////
-class BreadthFirstSearch {
+class Puzzle {
     public:
-        BreadthFirstSearch(int n, int numbers[]);
+        Puzzle(int n, int numbers[], int algo);
         int size;
         int* numbers;
+        int algo;
         void findIndex(State &, int *, int *, int);
         void swapElementes(int*, int, int, int, int, int);
         vector<State> findSuccessors(State);
-        vector<State> search();
+        vector<State> solve(int &);
+        vector<State> BreadthFirstSearch(int &);
+        vector<State> DepthFirstSearch(int &, float deepness = numeric_limits<double>::infinity());
+        vector<State> IterativeDeepeningSearch(int &iter);
 };
 
-BreadthFirstSearch::BreadthFirstSearch(int n, int numbers[]) {
+Puzzle::Puzzle(int n, int numbers[], int algo) {
     this->size = n;
     this->numbers = new int[this->size * this->size];
     this->numbers = numbers;
+    this->algo = algo;
 }
 
-void BreadthFirstSearch::findIndex(State & s, int *first, int *second, int elem) {
+void Puzzle::findIndex(State & s, int *first, int *second, int elem) {
     for (int i=0; i<s.size; i++) {
         for (int j=0; j<s.size; j++) {
             if (s.board[i][j] == elem){
@@ -174,11 +174,11 @@ void BreadthFirstSearch::findIndex(State & s, int *first, int *second, int elem)
     }    
 }
 
-void BreadthFirstSearch::swapElementes(int* arr, int i, int j, int a, int b, int size) {
+void Puzzle::swapElementes(int* arr, int i, int j, int a, int b, int size) {
     swap(arr[size*i + j], arr[size*a + b]);
 }
 
-vector<State> BreadthFirstSearch::findSuccessors(State s) {
+vector<State> Puzzle::findSuccessors(State s) {
     int size = s.size;
     // Create successors vector.
     vector<State> succ;
@@ -207,24 +207,40 @@ vector<State> BreadthFirstSearch::findSuccessors(State s) {
     return succ;
 }
 
-vector<State> BreadthFirstSearch::search() {
-    int goalNumbers[] = {1,2,3,4,5,6,7,8,0};
-    int goalSize = 3;
+vector<State> Puzzle::solve(int &iter) {
+    if (algo == 0)
+        return BreadthFirstSearch(iter);
+    else if (algo == 1)
+        return DepthFirstSearch(iter);
+    else if (algo == 2)
+        return IterativeDeepeningSearch(iter);
+
+}
+
+vector<State> Puzzle::BreadthFirstSearch(int &iter) {
+    // Create goal state for given size.
+    int goalNumbers[size*size];
+    for (int i = 0; i < size*size - 1; i++) {
+        goalNumbers[i] = i+1;
+    }
+    goalNumbers[size*size - 1] = 0;
     int flag = 0;
-    int iter = 0;
 
     vector<State> solution;
     list<State> visited;
     queue<State> toBeExplored;
 
-    State goalState = State(goalSize, goalNumbers);
+
+    State goalState = State(size, goalNumbers);
     State currentState = State(this->size, this->numbers);
 
     if (currentState == goalState){
         solution.push_back(currentState);
         return solution;
     }
-    printState(&currentState);
+    // Optionally print a board view of current state.
+    //printState(&currentState);
+
     visited.push_back(currentState);
     visited.back().setPredecessor();
 
@@ -240,9 +256,7 @@ vector<State> BreadthFirstSearch::search() {
         cout << "ITERATION : " << iter << endl;
 
         currentState = toBeExplored.front();
-
         toBeExplored.pop();
-
         visited.push_back(currentState);
 
         if (currentState == goalState){
@@ -288,6 +302,108 @@ vector<State> BreadthFirstSearch::search() {
     }
     
     return solution;
-
 }
 
+vector<State> Puzzle::DepthFirstSearch(int &iter, float maxDeepness) {
+    // Create goal state for given size.
+    int goalNumbers[size*size];
+    for (int i = 0; i < size*size - 1; i++) {
+        goalNumbers[i] = i+1;
+    }
+    goalNumbers[size*size - 1] = 0;
+    int flag = 0;
+
+    vector<State> solution;
+    list<State> visited;
+    stack<State> toBeExplored;
+
+    State goalState = State(size, goalNumbers);
+    State currentState = State(this->size, this->numbers);
+    currentState.depth = 0;
+
+    if (currentState == goalState){
+        solution.push_back(currentState);
+        return solution;
+    }
+    // Optionally print a board view of current state.
+    //printState(&currentState);
+
+    visited.push_back(currentState);
+    visited.back().setPredecessor();
+
+    vector<State> s = findSuccessors(currentState);
+
+    for (auto& it : s) {
+        it.setPredecessor(visited.back());
+        it.depth = currentState.depth + 1;
+        toBeExplored.push(it);
+    }
+
+    while (!toBeExplored.empty()) {
+        iter++;
+        cout << "ITERATION : " << iter << endl;
+
+        currentState = toBeExplored.top();
+        toBeExplored.pop();
+        visited.push_back(currentState);
+
+        if (currentState == goalState){
+            cout << "ENTERED GOAL STATE 1" << endl;
+            State* check; 
+            check = &(visited.back());
+            solution.push_back(*check);
+            while (check->predecessor != check) {
+                check = check->predecessor;
+                solution.push_back(*check);
+            }
+            return solution;
+        }
+        // If current state is in max deepness, don't add its successors to the stack.
+        if (currentState.depth < maxDeepness){
+            vector<State> succ = findSuccessors(currentState);
+            for (auto& it : succ) {
+                it.depth = currentState.depth + 1;
+                if (it == goalState){
+                    it.setPredecessor(visited.back());
+                    cout << "ENTERED GOAL STATE 2" << endl;
+                    solution.push_back(it);
+                    State *sPtr;
+                    sPtr = &it;
+                    while (sPtr->predecessor != sPtr) {
+                        sPtr = sPtr->predecessor;
+                        solution.push_back(*sPtr);
+                    }
+                    return solution;
+                }
+                else {;
+                    for (auto& v : visited) {
+                        if (v == it) {
+                            flag = 1;
+                            break;
+                        }
+                    }              
+                    if (flag==0){
+                        it.setPredecessor(visited.back());
+                        toBeExplored.push(it);
+                    }
+                    flag = 0;
+                }
+            }
+        }
+    }
+    
+    return solution;
+}
+
+
+vector<State> Puzzle::IterativeDeepeningSearch(int &iter) {
+    // Call DepthFirstSearch by incrementing the deepness value each time.
+    int deepness = 0;
+    vector<State> solution;
+    while (solution.size() == 0) {
+        deepness++;
+        solution = DepthFirstSearch(iter, deepness);
+    }
+
+    return solution;
+}
