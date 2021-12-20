@@ -90,8 +90,8 @@ void MyFrame::OnHello(wxCommandEvent& event)
 
 void MyFrame::OnClick(wxCommandEvent& event) {
     int size = 3;
-    int algo = 2;
-    string inp[10] = {"1", "5", "2", "4", "0", "3", "7", "8", "6"};
+    int algo = 3;
+    string inp[10] = {"3", "4", "6", "1", "0", "8", "7", "2", "5"};
     triggerSearch(size,algo, inp);
 }
 
